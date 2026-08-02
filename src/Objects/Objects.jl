@@ -120,6 +120,29 @@ export ROOTObject,
     arraylen,
     arraydims,
     describe,
+    # values inside a branch
+    CppType,
+    parse_typename,
+    cppname,
+    ValuePlan,
+    ScalarPlan,
+    PackedPlan,
+    StringPlan,
+    CharStarPlan,
+    TObjectPlan,
+    DatimePlan,
+    FixedPlan,
+    CountedPlan,
+    SequencePlan,
+    BitsetPlan,
+    ObjectPlan,
+    MemberPlan,
+    PointerPlan,
+    OpaquePlan,
+    class_plan,
+    type_plan,
+    read_value,
+    value_eltype,
     # registry
     register_class!,
     class_registry,
@@ -135,6 +158,9 @@ include("streamerinfo.jl")
 include("dictionary.jl")
 include("streamers_gen.jl")
 include("layout.jl")
+include("typename.jl")
+include("values.jl")
+include("plan.jl")
 include("hist.jl")
 include("graph.jl")
 

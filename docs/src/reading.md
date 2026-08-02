@@ -74,6 +74,43 @@ array(b, "a")                     # ...and its first
 array(b)                          # ArgumentError: name one of "b", "a"
 ```
 
+### Object branches
+
+A branch may hold a C++ object rather than a number. It is read the same way —
+there is nothing to name inside it, because its value *is* the object — and the
+shapes are the ones the types have:
+
+| C++ | Julia |
+|---|---|
+| a class | `NamedTuple`, its members named as they are streamed |
+| a base class | a member named for the base, at the front |
+| `std::vector`, `list`, `deque`, `set`, `bitset`, `RVec` | `Vector` |
+| `std::map`, `unordered_map` | `Vector` of `(first, second)` `NamedTuple`s |
+| `std::string`, `TString` | `String` |
+| `TDatime` | `Dates.DateTime` |
+| a `[10]` member, or a member counted by another | `Vector`, one per entry |
+
+```julia
+TTree.open("small-evnt-tree-nosplit.root") do f
+    evts = array(f["tree"], "evt")   # 100-element Vector{@NamedTuple{...}}
+
+    evts[1].StlVecF64                # Vector{Float64}, the member's own values
+    evts[1].P3.Px                    # a member that is itself a class
+    sum(e.F64 for e in evts)
+end
+```
+
+How the branch was written is not visible from here. A split branch — one
+sub-branch per member, which is what ROOT writes at a high split level — is put
+back together into the same entries an unsplit branch gives, and so is a
+member-wise-streamed collection, where every element's first member is written
+before any element's second. [`isobjectbranch`](@ref
+TTree.Trees.isobjectbranch) says which kind of branch is in hand.
+
+A fixed-size member gives one array per entry rather than a column of a matrix,
+unlike the fixed-length *leaf* above: it is a member of an object, not a column
+of the tree.
+
 ### Streaming
 
 ```@docs
@@ -91,7 +128,10 @@ end
 ```
 
 Each chunk is shaped the way `array` shapes the whole branch, and concatenating
-them gives back exactly what `array` would have returned.
+them gives back exactly what `array` would have returned. That holds for an
+object branch too, with one caveat: a split branch has no baskets of its own —
+its members' baskets are its children's — so it has nothing to hand over a
+basket at a time, and its single chunk is the whole column.
 
 For the records underneath — the compressed payload as it sits on the file —
 there is [`eachbasket`](@ref TTree.Trees.eachbasket).

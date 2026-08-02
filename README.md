@@ -1,6 +1,5 @@
 # TTree.jl
 
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://rob-c.github.io/TTree.jl/dev/)
 [![Build Status](https://github.com/rob-c/TTree.jl/workflows/CI/badge.svg)](https://github.com/rob-c/TTree.jl/actions)
 [![License](https://img.shields.io/badge/license-LGPL-blue.svg)](LICENSE)
 
@@ -72,6 +71,29 @@ TTree.open("dirs.root") do f
     f["dir1/dir11/h1"]           # TH1F("h1", 100 bins, 5.0 entries)
 end
 ```
+
+### Object branches
+
+A branch may hold a C++ object rather than a number, and is read the same way.
+The shapes are the ones the types have: a class comes back as a `NamedTuple`
+with its members named, a base class nested under its own name; an STL sequence
+or set as a `Vector`; a map as a `Vector` of `first`/`second` pairs; a
+`std::string` or `TString` as a `String`.
+
+```julia
+TTree.open("small-evnt-tree-nosplit.root") do f
+    evts = array(f["tree"], "evt")   # 100-element Vector{@NamedTuple{...}}
+
+    evts[1].StlVecF64                # Vector{Float64}, the member's own values
+    evts[1].P3.Px                    # a member that is itself a class
+    sum(e.F64 for e in evts)
+end
+```
+
+Whether the branch was written whole or split into one sub-branch per member is
+not visible from here: the same events read back the same either way. Nor is
+member-wise streaming, `TClonesArray`, or a collection of collections — all of
+which come back as the values they hold.
 
 ### Remote files
 
@@ -164,10 +186,10 @@ and `TH1` v3 through v8 without a special case per version.
 | Compression: zlib, LZ4, ZSTD, LZMA | read and write |
 | `TTree` / `TNtuple` structure and metadata | read and write |
 | Branch values: all numeric leaves, fixed and variable length, strings | read |
+| Object branches: classes, STL containers, split and unsplit | read |
 | Histograms, profiles, graphs | read and write |
 | `TObjString`, `TList`, `THashList`, `TObjArray`, `TArray*` | read and write |
 | Streamer info | read and write |
-| Object branches (`TLeafElement`, `TLeafObject`) | not yet — `array` says so rather than guessing |
 | Creating tree baskets from Julia data | not yet |
 | `RNTuple` | no |
 
@@ -212,10 +234,9 @@ installation.
 ## Relation to other packages
 
 [UnROOT.jl](https://github.com/JuliaHEP/UnROOT.jl) is the established Julia
-reader and is the more mature choice for reading, including the object branches
-this package does not decode yet. TTree.jl is an independent implementation
-written to be symmetric — the same byte layer writes what it reads — and to
-keep the file container usable by itself.
+reader and is the more mature choice for reading alone. TTree.jl is an
+independent implementation written to be symmetric — the same byte layer writes
+what it reads — and to keep the file container usable by itself.
 
 The format was implemented from ROOT's own documentation and from the files
 themselves. [go-hep/groot](https://github.com/go-hep/hep) was consulted as a

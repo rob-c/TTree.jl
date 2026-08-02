@@ -78,20 +78,19 @@ decodes with the same code that reads one ROOT wrote.
 | Compression: zlib, LZ4, ZSTD, LZMA | read and write |
 | `TTree` / `TNtuple` structure and metadata | read and write |
 | Branch values: all numeric leaves, fixed and variable length, strings | read |
+| Object branches: classes, STL containers, split and unsplit | read |
 | Histograms, profiles, graphs | read and write |
 | `TObjString`, `TList`, `THashList`, `TObjArray`, `TArray*` | read and write |
 | Streamer info | read and write |
-| Object branches (`TLeafElement`, `TLeafObject`) | not yet — `array` says so rather than guessing |
 | Creating tree baskets from Julia data | not yet |
 | `RNTuple` | no |
 
 ## Relation to other packages
 
 [UnROOT.jl](https://github.com/JuliaHEP/UnROOT.jl) is the established Julia
-reader and is the more mature choice for reading, including the object branches
-this package does not decode yet. TTree.jl is an independent implementation
-written to be symmetric — the same byte layer writes what it reads — and to
-keep the file container usable by itself.
+reader and is the more mature choice for reading alone. TTree.jl is an
+independent implementation written to be symmetric — the same byte layer writes
+what it reads — and to keep the file container usable by itself.
 
 The format was implemented from ROOT's own documentation and from the files
 themselves. [go-hep/groot](https://github.com/go-hep/hep) was consulted as a

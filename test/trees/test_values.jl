@@ -145,11 +145,16 @@ end
         @test entrycount(array(b, Objects.name(leaves(b)[1]))) == 0
     end
 
-    # An object branch is not decoded, and says so rather than returning bytes.
+    # An object branch is read whole — its value is the object, not one leaf of
+    # it — so its own leaf name is no more than a longer way of asking for the
+    # branch, and no other name means anything. What the objects themselves
+    # look like is in `test_objects.jl`.
     TTree.open(joinpath(corpus_dir(), "small-evnt-tree-nosplit.root")) do f
         t = f["tree"]
         b = first(allbranches(t))
-        @test leaves(b)[1] isa Union{TLeafElement,TLeafObject}
-        @test_throws ArgumentError array(b)
+        l = leaves(b)[1]
+        @test l isa Union{TLeafElement,TLeafObject}
+        @test array(b, Objects.name(l)) == array(b)
+        @test_throws KeyError array(b, "no-such-leaf")
     end
 end

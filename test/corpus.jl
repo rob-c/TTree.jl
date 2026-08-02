@@ -13,6 +13,8 @@
 # is what makes the comparison possible on a machine with no ROOT installed.
 # Regenerate it with `dev/gen_corpus_reference.jl`.
 
+using Dates: DateTime
+
 using TTree
 using TTree.IOFS
 using TTree.Objects
@@ -118,6 +120,103 @@ entryvalues(m::AbstractMatrix, i::Integer) = @view m[:, i]
 
 "A leaf's values as [`leafdigest`](@ref) wants them, whatever shape it came in."
 asentries(a) = (entryvalues(a, i) for i in 1:entrycount(a))
+
+# ---------------------------------------------------------------------------
+# Object digests.
+#
+# An object branch holds a C++ object rather than a number, so there is nothing
+# as simple as a leaf's value list to compare. What is compared instead is a
+# canonical spelling of the whole object — one that names every member and
+# every nesting level, so that a member read at the wrong width, in the wrong
+# order, or into the wrong shape all show up as different text.
+#
+#     i<dec>            a signed integer
+#     u<dec>            an unsigned integer
+#     b0 / b1           a bool
+#     f<8 hex digits>   a float, as its bit pattern
+#     d<16 hex digits>  a double, as its bit pattern
+#     s<len>:<bytes>    a string, TString or std::string alike
+#     t<dec>            a TDatime, as the packed number ROOT stores
+#     [<n>:<values>]    a sequence: a container, a fixed array, a counted member
+#     {<n>:<name>=<v>…} an object, its base classes named as members
+#
+# Floats go out as bit patterns because a decimal spelling would compare two
+# roundings rather than two values. `dev/gen_corpus_objects.jl` writes the same
+# spelling from the C++ side; the two are only useful together.
+
+"C's ordering of a member's values — the order ROOT streams a `[2][3]` in."
+_corder(v::AbstractVector) = v
+function _corder(a::AbstractArray{<:Any,N}) where {N}
+    return vec(permutedims(a, ntuple(i -> N - i + 1, N)))
+end
+
+_canon(io::IO, x::Bool) = print(io, x ? "b1" : "b0")
+_canon(io::IO, x::Signed) = print(io, 'i', x)
+_canon(io::IO, x::Unsigned) = print(io, 'u', x)
+_canon(io::IO, x::Float32) = print(io, 'f', string(reinterpret(UInt32, x); base=16, pad=8))
+_canon(io::IO, x::Float64) = print(io, 'd', string(reinterpret(UInt64, x); base=16, pad=16))
+_canon(io::IO, s::AbstractString) = print(io, 's', ncodeunits(s), ':', s)
+_canon(io::IO, t::DateTime) = print(io, 't', TTree.Bytes.datetime_to_datime(t))
+
+function _canon(io::IO, a::AbstractArray)
+    print(io, '[', length(a), ':')
+    for x in _corder(a)
+        _canon(io, x)
+    end
+    return print(io, ']')
+end
+
+function _canon(io::IO, nt::NamedTuple)
+    print(io, '{', length(nt), ':')
+    for (k, x) in pairs(nt)
+        print(io, k, '=')
+        # The top byte of a TObject's fBits is memory state — kIsOnHeap and
+        # kNotDeleted are set by ROOT's constructor and never written — so only
+        # the stored bits are compared.
+        _canon(io, k === :fBits ? x & 0x00ffffff : x)
+    end
+    return print(io, '}')
+end
+
+"""
+    objectcanon(entries; unordered=false) -> String
+
+One object branch, every entry after another, in the canonical spelling above.
+
+`unordered` is for a branch holding an `unordered_set` or `unordered_map`,
+where there is no order to compare: what ROOT iterates is the bucket order its
+own hash produced while reading, not the order the elements were written in.
+Its entries are spelled with their elements sorted, which is what
+`dev/gen_corpus_objects.jl` does for the same containers. Nothing distinguishes
+such a container from an ordered one once it has been read — both are a
+`Vector` — so the caller says which it was, from the class name the reference
+records.
+"""
+function objectcanon(entries; unordered::Bool=false)
+    return sprint() do io
+        for v in entries
+            unordered ? _canon_unordered(io, v) : _canon(io, v)
+        end
+    end
+end
+
+function _canon_unordered(io::IO, a::AbstractVector)
+    parts = sort!([sprint(_canon, x) for x in a])
+    print(io, '[', length(a), ':')
+    for p in parts
+        print(io, p)
+    end
+    return print(io, ']')
+end
+
+"FNV-1a over a canonical spelling, which is how the reference file records it."
+function objectdigest(s::AbstractString)
+    h = _FNV_OFFSET
+    for b in codeunits(s)
+        h = _fnv(h, b)
+    end
+    return h
+end
 
 # ---------------------------------------------------------------------------
 # The reference files.

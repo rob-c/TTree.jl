@@ -1,6 +1,10 @@
 using Documenter
 using TTree
 
+# A doctest runs in a sandbox that starts out empty, so the package has to be
+# put there before any example can name it.
+DocMeta.setdocmeta!(TTree, :DocTestSetup, :(using TTree); recursive=true)
+
 makedocs(;
     sitename="TTree.jl",
     # Given outright rather than taken from the git remote, so that the docs

@@ -115,3 +115,34 @@ the normal state of a small tree.
 Leaf types map to Julia types directly, with two that do not: `Float16_t` and
 `Double32_t` are stored scaled into a declared range and occupy fewer bytes
 than their names suggest, so they are unpacked value by value.
+
+### Object branches
+
+A branch may hold a C++ object instead. Then the leaf says almost nothing —
+there is no width and no count to read — and what the entry contains is decided
+by the class description in the file's streamer record, walked the same way an
+object anywhere else on the file is walked.
+
+Two things about the branch itself decide *which* description, and how much of
+it applies:
+
+  - `fType` says what kind of branch it is: a whole object written in one
+    piece, the top of a split object, one sub-branch of a split object, or the
+    top of a `TClonesArray` or STL collection.
+  - `fID` says which part of the class the branch holds: `-1` for the whole
+    object, `-2` for an object whose members all went to sub-branches, and
+    otherwise an index into the class's elements — that one member and nothing
+    else.
+
+Splitting is ROOT's choice at write time, and it goes all the way down: a
+member that is itself a class can become a branch per member, and each of those
+holds one member's values for every entry. Reading a split branch is therefore
+reading its children and putting the entries back together.
+
+A collection may also be streamed *member-wise* — every element's first member,
+then every element's second — rather than element after element. Which of the
+two a slot uses is a bit in that slot's version word, so it is a property of
+where the collection was written and not of its type.
+
+None of that reaches the values: a branch is read as the objects it holds,
+whichever of these forms they were written in.

@@ -36,6 +36,7 @@ include("corpus.jl")
             include("objects/test_hist_corpus.jl")
             include("trees/test_structure.jl")
             include("trees/test_values.jl")
+            include("trees/test_objects.jl")
             include("trees/test_roundtrip.jl")
         end
     else

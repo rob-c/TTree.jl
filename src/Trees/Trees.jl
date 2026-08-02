@@ -28,12 +28,17 @@ using ..Objects
 using ..Objects:
     Objects,
     base_type,
+    headerclass,
+    is_container,
     julia_type,
     layout,
     read_count,
+    read_counted,
+    read_many,
     read_objarray!,
     read_pointer_array,
     read_scalar,
+    readbody,
     scalar_type,
     unknown_member,
     write_objarray!,
@@ -82,11 +87,13 @@ export Tree,
     elementtype,
     valuesize,
     isjagged,
+    isobjectbranch,
     nbaskets,
     basket,
     eachbasket,
     eachchunk,
     BranchChunks,
+    ObjectChunks,
     entrybytes,
     read_basket
 
@@ -96,6 +103,7 @@ include("branch.jl")
 include("basket.jl")
 include("tree.jl")
 include("array.jl")
+include("element.jl")
 
 for (cls, ctor) in (
     "ROOT::TIOFeatures" => TIOFeatures,
