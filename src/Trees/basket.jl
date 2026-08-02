@@ -122,9 +122,12 @@ function read_basket(src::AbstractSource, seek::Integer, nbytes::Integer=0)
     is_compressed(k) && (payload = Compress.decompress(payload, k.objlen))
 
     # `fLast` is measured from the start of the key, where ROOT numbers buffer
-    # positions from; the payload starts `fKeylen` further on.
+    # positions from; the payload starts `fKeylen` further on. A border of zero
+    # is not the degenerate case it looks like: a basket of empty entries — a
+    # variable-length branch that happened to hold nothing over its whole range
+    # — is all offset table and no data.
     border = Int(b.last) - Int(k.keylen)
-    (0 < border <= length(payload)) || (border = length(payload))
+    (0 <= border <= length(payload)) || (border = length(payload))
 
     if border < length(payload) && b.nevbuf > 0
         p = RBuffer(payload)

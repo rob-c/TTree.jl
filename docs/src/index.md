@@ -77,12 +77,12 @@ decodes with the same code that reads one ROOT wrote.
 | Files, directories, keys, free list | read and write |
 | Compression: zlib, LZ4, ZSTD, LZMA | read and write |
 | `TTree` / `TNtuple` structure and metadata | read and write |
-| Branch values: all numeric leaves, fixed and variable length, strings | read |
+| Branch values: all numeric leaves, fixed and variable length, strings | read and write |
 | Object branches: classes, STL containers, split and unsplit | read |
 | Histograms, profiles, graphs | read and write |
 | `TObjString`, `TList`, `THashList`, `TObjArray`, `TArray*` | read and write |
 | Streamer info | read and write |
-| Creating tree baskets from Julia data | not yet |
+| Writing object branches from Julia data | not yet |
 | `RNTuple` | no |
 
 ## Relation to other packages

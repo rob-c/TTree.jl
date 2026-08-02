@@ -127,7 +127,10 @@ export ROOTFile,
     entries,
     basket,
     eachbasket,
-    eachchunk
+    eachchunk,
+    TreeWriter,
+    branch!,
+    flush!
 
 """
     open(target; kwargs...) -> ROOTFile

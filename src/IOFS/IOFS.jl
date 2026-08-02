@@ -80,6 +80,7 @@ export
     allocate!,
     write!,
     put_key!,
+    put_record!,
     append_key!,
     write_keys!,
     read_file_header!,

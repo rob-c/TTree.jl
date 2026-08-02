@@ -95,7 +95,11 @@ export Tree,
     BranchChunks,
     ObjectChunks,
     entrybytes,
-    read_basket
+    read_basket,
+    TreeWriter,
+    ColumnWriter,
+    branch!,
+    flush!
 
 include("iofeatures.jl")
 include("leaf.jl")
@@ -104,6 +108,7 @@ include("basket.jl")
 include("tree.jl")
 include("array.jl")
 include("element.jl")
+include("write.jl")
 
 for (cls, ctor) in (
     "ROOT::TIOFeatures" => TIOFeatures,

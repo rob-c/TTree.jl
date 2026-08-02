@@ -26,6 +26,7 @@ include("corpus.jl")
     include("objects/test_graph.jl")
     include("objects/test_streamers.jl")
     include("trees/test_fixture.jl")
+    include("trees/test_write.jl")
 
     # The tree tests read ROOT's own files rather than any this package wrote,
     # which is the only way to find out whether it agrees with ROOT — and which

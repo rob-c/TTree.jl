@@ -153,6 +153,44 @@ The file that comes out is an ordinary ROOT file: header, key list, streamer
 info record and free list, compressed with the same codecs ROOT uses (zlib,
 LZ4, ZSTD, LZMA — `compression` on `create` sets which).
 
+### Writing a tree
+
+Columns already in memory go out in one call, each branch taking its shape from
+the type it was given:
+
+```julia
+TTree.create("out.root") do f
+    write!(f, "tree", (
+        x = Int32.(1:1000),                              # one value per entry
+        s = ["row-$i" for i in 1:1000],                  # a string
+        p = randn(3, 1000),                              # three values
+        v = [rand(Float32, rand(0:3)) for _ in 1:1000],  # as many as there are
+    ))
+end
+```
+
+A variable-length column is counted by a branch of its own — `nv` next to `v` —
+which is how ROOT records the length and how ROOT will read it back.
+
+Entries can also be pushed one at a time, for a tree that does not fit in
+memory or one computed as it goes:
+
+```julia
+TTree.create("out.root") do f
+    TreeWriter(f, "events") do t
+        branch!(t, "n", Int32)
+        branch!(t, "px", Vector{Float32}; count="n")     # sharing one counter
+        branch!(t, "py", Vector{Float32}; count="n")
+        for evt in source
+            push!(t, (n=Int32(length(evt)), px=first.(evt), py=last.(evt)))
+        end
+    end
+end
+```
+
+Each column flushes a basket of its own as it fills, so a wide tree stays cheap
+to read one column of — which is the whole point of the format.
+
 ### Class descriptions
 
 Every ROOT file carries the layout of the classes it contains, which is how a
@@ -185,17 +223,19 @@ and `TH1` v3 through v8 without a special case per version.
 | Files, directories, keys, free list | read and write |
 | Compression: zlib, LZ4, ZSTD, LZMA | read and write |
 | `TTree` / `TNtuple` structure and metadata | read and write |
-| Branch values: all numeric leaves, fixed and variable length, strings | read |
+| Branch values: all numeric leaves, fixed and variable length, strings | read and write |
 | Object branches: classes, STL containers, split and unsplit | read |
 | Histograms, profiles, graphs | read and write |
 | `TObjString`, `TList`, `THashList`, `TObjArray`, `TArray*` | read and write |
 | Streamer info | read and write |
-| Creating tree baskets from Julia data | not yet |
+| Writing object branches from Julia data | not yet |
 | `RNTuple` | no |
 
-A tree read from a file can be re-encoded byte for byte, but writing a tree
-whose baskets live in a *different* file is not supported yet: the metadata
-would be written and the basket offsets would point into the file it came from.
+Trees are written from Julia columns — numbers, fixed-size arrays, strings and
+variable-length arrays, in as many baskets as the data calls for. What cannot be
+written is a branch of whole objects, and a tree *read* from one file cannot be
+handed to another: its metadata would go out with basket offsets pointing into
+the file it came from.
 
 ## Layers
 

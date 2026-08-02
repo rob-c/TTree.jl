@@ -443,11 +443,25 @@ function allocate!(f::ROOTFile, nbytes::Integer)
     return off
 end
 
-"Write a key header and its already-encoded payload at the key's own offset."
-function _emit_key!(f::ROOTFile, k::Key, payload::AbstractVector{UInt8})
+"""
+    _emit_key!(f, k, payload, header=UInt8[]) -> k
+
+Write a key header and its already-encoded payload at the key's own offset.
+
+`header` is the class-specific tail some records keep *inside* the key rather
+than in the payload — a `TBasket`'s bookkeeping — and is counted in `keylen`,
+which is what makes the payload start where the key says it does.
+"""
+function _emit_key!(
+    f::ROOTFile,
+    k::Key,
+    payload::AbstractVector{UInt8},
+    header::AbstractVector{UInt8}=UInt8[],
+)
     sink = f.sink::AbstractSink
     w = WBuffer()
     write_key!(w, k)
+    isempty(header) || write_bytes!(w, header)
     hdr = bytes(w)
     length(hdr) == k.keylen || throw(
         ArgumentError(
@@ -460,14 +474,72 @@ function _emit_key!(f::ROOTFile, k::Key, payload::AbstractVector{UInt8})
 end
 
 """
+    put_record!(f, name, title, class, obj::Vector{UInt8}; cycle=1, header=UInt8[], keylen=nothing, compression=nothing, seekpdir=nothing) -> Key
+
+Place an already-serialized object on the file as a record of its own.
+
+`obj` is compressed according to `compression` — the file's setting by default
+— and stored uncompressed if that would not have made it smaller.
+
+Nothing lists the result. That is what a record is for: a `TBasket` is found
+through the seek its branch recorded, not by name, and putting it in a
+directory would make it show up as an object of the file. [`put_key!`](@ref) is
+this plus the directory entry.
+
+`keylen` is the size of the header the payload was serialized against, and
+`header` the part of that header which is not the key itself — see
+[`_emit_key!`](@ref).
+"""
+function put_record!(
+    f::ROOTFile,
+    name::AbstractString,
+    title::AbstractString,
+    class::AbstractString,
+    obj::Vector{UInt8};
+    cycle::Integer=1,
+    header::AbstractVector{UInt8}=UInt8[],
+    keylen=nothing,
+    compression=nothing,
+    seekpdir=nothing,
+)
+    f.sink === nothing && throw(ArgumentError("TTree: $(f.id) is open for reading only"))
+
+    settings = if compression === nothing
+        settings_from(f.compression)
+    else
+        (compression isa Compress.Settings ? compression : settings_from(compression))
+    end
+    payload = Compress.compress(obj, settings)
+
+    if keylen === nothing
+        keylen = keylen_for(name, title, class; bigfile=f.fend > START_BIG_FILE)
+    end
+    nbytes = Int32(keylen) + Int32(length(payload))
+    seekkey = allocate!(f, Int64(nbytes))
+
+    k = Key(;
+        name=name,
+        title=title,
+        class=class,
+        cycle=cycle,
+        objlen=Int32(length(obj)),
+        nbytes=nbytes,
+        keylen=keylen,
+        seekkey=seekkey,
+        seekpdir=seekpdir === nothing ? f.fbegin : Int64(seekpdir),
+    )
+    _emit_key!(f, k, payload, header)
+    return k
+end
+
+"""
     put_key!(f, dir, name, title, class, obj::Vector{UInt8}; cycle=nothing, compression=nothing, keylen=nothing) -> Key
 
 Place an already-serialized object into `dir` as a new key.
 
-`obj` is compressed according to `compression` — the file's setting by default
-— and stored uncompressed if that would not have made it smaller. The cycle
-defaults to one past the highest already present under `name`, which is how
-ROOT keeps successive writes of the same object addressable.
+The cycle defaults to one past the highest already present under `name`, which
+is how ROOT keeps successive writes of the same object addressable; the rest is
+[`put_record!`](@ref).
 
 `keylen` is the size of the header the payload was serialized against. It is
 computable from the names alone, and is a keyword only so that a caller which
@@ -485,21 +557,6 @@ function put_key!(
     compression=nothing,
     keylen=nothing,
 )
-    f.sink === nothing && throw(ArgumentError("TTree: $(f.id) is open for reading only"))
-
-    settings = if compression === nothing
-        settings_from(f.compression)
-    else
-        (compression isa Compress.Settings ? compression : settings_from(compression))
-    end
-    payload = Compress.compress(obj, settings)
-
-    if keylen === nothing
-        keylen = keylen_for(name, title, class; bigfile=f.fend > START_BIG_FILE)
-    end
-    nbytes = Int32(keylen) + Int32(length(payload))
-    seekkey = allocate!(f, Int64(nbytes))
-
     if cycle === nothing
         cycle = Int16(1)
         for k in dir.keys
@@ -507,18 +564,17 @@ function put_key!(
         end
     end
 
-    k = Key(;
-        name=name,
-        title=title,
-        class=class,
+    k = put_record!(
+        f,
+        name,
+        title,
+        class,
+        obj;
         cycle=cycle,
-        objlen=Int32(length(obj)),
-        nbytes=nbytes,
         keylen=keylen,
-        seekkey=seekkey,
+        compression=compression,
         seekpdir=dir.seekdir == 0 ? f.fbegin : dir.seekdir,
     )
-    _emit_key!(f, k, payload)
     append_key!(dir, k)
     return k
 end
