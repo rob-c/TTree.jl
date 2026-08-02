@@ -79,10 +79,7 @@ using TTree.Trees
                 branch!(w, "mat", Float64, 3)
                 @test keys(w) == ["i32", "lab", "njag", "jag", "mat"]
                 for i in 1:N
-                    push!(
-                        w,
-                        (i32=i32[i], lab=lab[i], jag=jag[i], mat=@view(mat[:, i])),
-                    )
+                    push!(w, (i32=i32[i], lab=lab[i], jag=jag[i], mat=@view(mat[:, i])))
                 end
                 @test entries(w) == N
             end
@@ -340,9 +337,7 @@ using TTree.Trees
             # An entry that leaves a column out, or one whose fixed-size column
             # is the wrong length.
             @test_throws ArgumentError push!(w, (x=Int32(1),))
-            @test_throws ArgumentError push!(
-                w, (x=Int32(1), v=Float32[1], m=[1.0, 2.0])
-            )
+            @test_throws ArgumentError push!(w, (x=Int32(1), v=Float32[1], m=[1.0, 2.0]))
 
             push!(w, (x=Int32(1), v=Float32[1, 2], m=[1.0, 2.0, 3.0]))
             @test_throws ArgumentError branch!(w, "late", Int32)

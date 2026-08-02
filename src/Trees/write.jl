@@ -158,7 +158,9 @@ function TreeWriter(
     basketsize > 0 ||
         throw(ArgumentError("TTree: a basket size must be positive, not $basketsize"))
     t = Tree(name, isempty(title) ? name : title)
-    return TreeWriter(f, dir, t, ColumnWriter[], Int(basketsize), compression, 0, false, nothing)
+    return TreeWriter(
+        f, dir, t, ColumnWriter[], Int(basketsize), compression, 0, false, nothing
+    )
 end
 
 function TreeWriter(f::ROOTFile, name::AbstractString, title::AbstractString=""; kwargs...)
@@ -166,7 +168,11 @@ function TreeWriter(f::ROOTFile, name::AbstractString, title::AbstractString="";
 end
 
 function TreeWriter(
-    f::ROOTFile, name::AbstractString, schema::NamedTuple, title::AbstractString=""; kwargs...
+    f::ROOTFile,
+    name::AbstractString,
+    schema::NamedTuple,
+    title::AbstractString="";
+    kwargs...,
 )
     w = TreeWriter(f, f.dir, name, title; kwargs...)
     for (nm, T) in pairs(schema)
@@ -232,7 +238,11 @@ the same columns, and there would be nothing to put in the new one for the
 entries already written.
 """
 function branch!(
-    w::TreeWriter, name::AbstractString, ::Type{T}, n::Union{Nothing,Integer}=nothing; count=nothing
+    w::TreeWriter,
+    name::AbstractString,
+    ::Type{T},
+    n::Union{Nothing,Integer}=nothing;
+    count=nothing,
 ) where {T}
     return _branch!(w, String(name), T, n, count)
 end
@@ -278,7 +288,7 @@ function _elementtype(name::String, ::Type{T}) where {T}
     E <: AbstractString && (E = String)
     haskey(SCALAR_LEAVES, E) || throw(
         ArgumentError(
-            "TTree: branch $(repr(name)) holds $(E), which is not one of $(_leaftypes())"
+            "TTree: branch $(repr(name)) holds $(E), which is not one of $(_leaftypes())",
         ),
     )
     return E
@@ -289,7 +299,7 @@ function _plain_branch!(w::TreeWriter, name::String, ::Type{T}) where {T}
     S = T <: AbstractString ? String : T
     haskey(SCALAR_LEAVES, S) || throw(
         ArgumentError(
-            "TTree: branch $(repr(name)) holds $(T), which is not one of $(_leaftypes())"
+            "TTree: branch $(repr(name)) holds $(T), which is not one of $(_leaftypes())",
         ),
     )
     kind = S === String ? :string : :scalar
@@ -375,21 +385,7 @@ function _addcolumn!(
     b.leaves = Any[leaf]
 
     c = ColumnWriter(
-        name,
-        T,
-        kind,
-        per,
-        b,
-        leaf,
-        counter,
-        false,
-        counts,
-        WBuffer(),
-        Int32[],
-        0,
-        0,
-        0,
-        0,
+        name, T, kind, per, b, leaf, counter, false, counts, WBuffer(), Int32[], 0, 0, 0, 0
     )
     push!(w.columns, c)
     return c
