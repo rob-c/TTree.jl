@@ -1,6 +1,10 @@
+# TTree itself is not listed: it is developed into this environment from the
+# checkout, which is also the only way to get XRootD 0.3 in, since neither that
+# nor this package is registered yet. Listing it here would make the resolver
+# look for it in the registry before either could be developed. See the docs
+# job in .github/workflows/ci.yml.
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-TTree = "fdc6bb28-ac21-4e44-ab39-316278fae000"
 
 [compat]
 Documenter = "1"
