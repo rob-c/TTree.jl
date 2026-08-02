@@ -1,0 +1,130 @@
+name: CI
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags: '*'
+  # The corpus job below runs on these two only; see the note on it.
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+jobs:
+  format:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - run: |
+          julia -e '
+            using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter
+            format(".", verbose=true) || error("Run JuliaFormatter before pushing")'
+  test:
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        version:
+          - '1.10'
+          - '1' # Leave this line unchanged. '1' will automatically expand to the latest stable 1.x release of Julia.
+        os:
+          - ubuntu-latest
+          - macOS-latest
+        arch:
+          - x64
+        exclude:
+          # macOS runners are arm64; x64 there would be emulated.
+          - os: macOS-latest
+            arch: x64
+        include:
+          - os: macOS-latest
+            arch: aarch64
+            version: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.version }}
+          arch: ${{ matrix.arch }}
+      - uses: julia-actions/cache@v2
+      # XRootD.jl 0.3 — the pure-Julia rewrite this package is written against
+      # — is not in the general registry yet, so it comes from its branch.
+      # Delete this step once 0.3 is released.
+      - name: Unreleased XRootD.jl
+        run: |
+          julia --project=. -e '
+            using Pkg
+            Pkg.add(PackageSpec(url="https://github.com/rob-c/XRootD.jl",
+                                rev="rewrite/0.3-pure-julia"))'
+      - uses: julia-actions/julia-buildpkg@v1
+      # The tests that compare against ROOT read the go-hep corpus, which is
+      # not shipped with this package; without it they are skipped and the rest
+      # of the suite — including the tree fixture under test/data — still runs.
+      - uses: julia-actions/julia-runtest@v1
+      - uses: julia-actions/julia-processcoverage@v1
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: rob-c/TTree.jl
+          fail_ci_if_error: false
+  corpus:
+    name: Against ROOT's own files
+    runs-on: ubuntu-latest
+    # Weekly and on demand rather than on every push: the corpus is another
+    # project's working tree, so a change there says something about that
+    # project's schedule and not about this commit. A failure here is worth
+    # knowing about; blocking a pull request on it is not.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the go-hep corpus
+        uses: actions/checkout@v4
+        with:
+          repository: go-hep/hep
+          path: go-hep
+          sparse-checkout: groot/testdata
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Unreleased XRootD.jl
+        run: |
+          julia --project=. -e '
+            using Pkg
+            Pkg.add(PackageSpec(url="https://github.com/rob-c/XRootD.jl",
+                                rev="rewrite/0.3-pure-julia"))'
+      - uses: julia-actions/julia-buildpkg@v1
+      - uses: julia-actions/julia-runtest@v1
+        env:
+          TTREE_TESTDATA: ${{ github.workspace }}/go-hep/groot/testdata
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      # XRootD.jl comes first: the registry has no 0.3 for the resolver to find,
+      # so developing this package before it is there fails to resolve. See the
+      # note on the test job.
+      - run: |
+          julia --project=docs -e '
+            using Pkg
+            Pkg.add(PackageSpec(url="https://github.com/rob-c/XRootD.jl",
+                                rev="rewrite/0.3-pure-julia"))
+            Pkg.develop(PackageSpec(path=pwd()))
+            Pkg.instantiate()'
+      - run: julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
