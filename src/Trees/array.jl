@@ -202,8 +202,12 @@ end
 Most leaves are packed numbers and take the bulk path; a `Float16_t` or
 `Double32_t` leaf is stored scaled into its declared range, so each value is
 unpacked on its own.
+
+A leaf whose values are not numbers at all — a string, a streamed object — is
+refused here rather than reinterpreted: those are read by their own path, or
+not yet read.
 """
-read_values(r::RBuffer, l, n::Integer) = read_array(r, elementtype(l), n)
+read_values(r::RBuffer, l::PlainLeaf, n::Integer) = read_array(r, elementtype(l), n)
 
 function read_values(r::RBuffer, l::TLeafF16, n::Integer)
     xmin, xmax, factor = _leaf_range(l)
@@ -213,6 +217,14 @@ end
 function read_values(r::RBuffer, l::TLeafD32, n::Integer)
     xmin, xmax, factor = _leaf_range(l)
     return Float64[read_double32(r, xmin, xmax, factor) for _ in 1:n]
+end
+
+function read_values(::RBuffer, l, ::Integer)
+    return throw(
+        ArgumentError(
+            "TTree: a $(typeof(l)) does not hold numbers, so its values are not read here"
+        ),
+    )
 end
 
 """
